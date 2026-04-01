@@ -10,7 +10,7 @@ const CONFIG = {
         {
             name: 'Bronze',
             icon: '🥉',
-            threshold: 6000,    // ab 6.000 € Gesamtumsatz
+            threshold: 6000,
             bonus: 120,
             color: '#cd7f32',
             colorLight: '#f5e6d0'
@@ -18,7 +18,7 @@ const CONFIG = {
         {
             name: 'Silber',
             icon: '🥈',
-            threshold: 8000,    // ab 8.000 €
+            threshold: 8000,
             bonus: 400,
             color: '#9ca3af',
             colorLight: '#e8eaed'
@@ -26,7 +26,7 @@ const CONFIG = {
         {
             name: 'Gold',
             icon: '🥇',
-            threshold: 12000,   // ab 12.000 €
+            threshold: 12000,
             bonus: 1000,
             color: '#eab308',
             colorLight: '#fef9c3'
@@ -34,7 +34,7 @@ const CONFIG = {
         {
             name: 'Diamant',
             icon: '💎',
-            threshold: 20000,   // ab 20.000 €
+            threshold: 20000,
             bonus: 2400,
             color: '#06b6d4',
             colorLight: '#cffafe'
@@ -44,30 +44,76 @@ const CONFIG = {
 
 
 // ============================================================
-// DATENMODELL
+// API-LAYER (ersetzt localStorage)
 // ============================================================
-const STORAGE_KEYS = {
-    entries: 'umsatztracker_entries',
-    timeEntries: 'umsatztracker_time_entries'
+const API = {
+    async getEntries() {
+        const res = await fetch('/api/entries');
+        return res.json();
+    },
+    async createEntry(data) {
+        const res = await fetch('/api/entries', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return res.json();
+    },
+    async updateEntry(id, data) {
+        const res = await fetch(`/api/entries/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return res.json();
+    },
+    async deleteEntry(id) {
+        await fetch(`/api/entries/${id}`, { method: 'DELETE' });
+    },
+    async getTimeEntries() {
+        const res = await fetch('/api/time-entries');
+        return res.json();
+    },
+    async createTimeEntry(data) {
+        const res = await fetch('/api/time-entries', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return res.json();
+    },
+    async updateTimeEntry(id, data) {
+        const res = await fetch(`/api/time-entries/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return res.json();
+    },
+    async deleteTimeEntry(id) {
+        await fetch(`/api/time-entries/${id}`, { method: 'DELETE' });
+    },
+    async exportData() {
+        const res = await fetch('/api/export');
+        return res.json();
+    },
+    async importData(data) {
+        const res = await fetch('/api/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return res.json();
+    },
+    async resetData() {
+        await fetch('/api/reset', { method: 'DELETE' });
+    }
 };
 
-function loadData(key) {
-    try {
-        return JSON.parse(localStorage.getItem(key)) || [];
-    } catch {
-        return [];
-    }
-}
 
-function saveData(key, data) {
-    localStorage.setItem(key, JSON.stringify(data));
-}
-
-function generateId() {
-    if (crypto.randomUUID) return crypto.randomUUID();
-    return 'xxxx-xxxx-xxxx'.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
-}
-
+// ============================================================
+// HILFSFUNKTIONEN
+// ============================================================
 function formatCurrency(amount) {
     return new Intl.NumberFormat(CONFIG.locale, {
         style: 'currency',
@@ -91,17 +137,18 @@ function getMonthLabel(yearMonth) {
     return d.toLocaleDateString(CONFIG.locale, { month: 'long', year: 'numeric' });
 }
 
-// ============================================================
-// STATE
-// ============================================================
-let currentMonth = getCurrentYearMonth();
-let revenueEntries = loadData(STORAGE_KEYS.entries);
-let timeEntries = loadData(STORAGE_KEYS.timeEntries);
-
 function getCurrentYearMonth() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
+
+
+// ============================================================
+// STATE
+// ============================================================
+let currentMonth = getCurrentYearMonth();
+let revenueEntries = [];
+let timeEntries = [];
 
 function getEntriesForMonth(yearMonth) {
     return revenueEntries
@@ -118,6 +165,7 @@ function getTimeEntriesForMonth(yearMonth) {
 function getMonthlyTotal(yearMonth) {
     return getEntriesForMonth(yearMonth).reduce((sum, e) => sum + e.amount, 0);
 }
+
 
 // ============================================================
 // BELOHNUNGSSYSTEM
@@ -148,13 +196,8 @@ function getOverallProgress(total) {
 
 function calculateRewards(total) {
     const tier = getCurrentTier(total);
-    if (!tier) {
-        return { bonus: 0, totalReward: 0 };
-    }
-    return {
-        bonus: tier.bonus,
-        totalReward: tier.bonus
-    };
+    if (!tier) return { bonus: 0, totalReward: 0 };
+    return { bonus: tier.bonus, totalReward: tier.bonus };
 }
 
 function getMotivationText(total) {
@@ -166,6 +209,7 @@ function getMotivationText(total) {
     const remaining = nextTier.threshold - total;
     return `Noch ${formatCurrency(remaining)} bis ${nextTier.icon} ${nextTier.name}!`;
 }
+
 
 // ============================================================
 // TAB NAVIGATION
@@ -184,6 +228,7 @@ tabs.forEach(tab => {
     });
 });
 
+
 // ============================================================
 // MONTH PICKER
 // ============================================================
@@ -201,19 +246,15 @@ function changeMonth(delta) {
 prevMonthBtn.addEventListener('click', () => changeMonth(-1));
 nextMonthBtn.addEventListener('click', () => changeMonth(1));
 
+
 // ============================================================
 // RENDERING
 // ============================================================
 function renderAll() {
     monthLabel.textContent = getMonthLabel(currentMonth);
     const total = getMonthlyTotal(currentMonth);
-
-    // Header total
     document.getElementById('headerTotal').textContent = formatCurrency(total);
-
-    // Set print data
     document.getElementById('timesheetCard').setAttribute('data-month', getMonthLabel(currentMonth));
-
     renderDashboard(total);
     renderEntries();
     renderTimesheet();
@@ -224,7 +265,6 @@ function renderDashboard(total) {
     const nextTier = getNextTier(total);
     const rewards = calculateRewards(total);
 
-    // Tier Card
     const tierCard = document.getElementById('tierCard');
     tierCard.className = 'card tier-card';
     if (tier) tierCard.classList.add(`tier-${tier.name.toLowerCase()}`);
@@ -233,22 +273,17 @@ function renderDashboard(total) {
     document.getElementById('tierName').textContent = tier ? tier.name : 'Noch keine Stufe';
     document.getElementById('tierMotivation').textContent = getMotivationText(total);
 
-    // Progress bar
     const progressPercent = getOverallProgress(total);
     const progressFill = document.getElementById('progressFill');
     const progressPulse = document.getElementById('progressPulse');
 
     progressFill.style.width = `${progressPercent}%`;
-    if (tier) {
-        progressFill.style.background = `linear-gradient(90deg, ${tier.color}, ${tier.colorLight})`;
-    }
+    if (tier) progressFill.style.background = `linear-gradient(90deg, ${tier.color}, ${tier.colorLight})`;
     progressPulse.style.left = `calc(${progressPercent}% - 7px)`;
 
-    // Progress markers
     const markersContainer = document.getElementById('progressMarkers');
     const maxThreshold = CONFIG.tiers[CONFIG.tiers.length - 1].threshold;
     markersContainer.innerHTML = '';
-
     markersContainer.style.position = 'relative';
     markersContainer.style.height = '22px';
 
@@ -262,7 +297,6 @@ function renderDashboard(total) {
         markersContainer.appendChild(marker);
     });
 
-    // Progress info
     document.getElementById('progressCurrent').textContent = formatCurrency(total);
     if (nextTier) {
         document.getElementById('progressNext').textContent = `Nächstes Ziel: ${formatCurrency(nextTier.threshold)}`;
@@ -272,24 +306,17 @@ function renderDashboard(total) {
         document.getElementById('progressNext').textContent = `Nächstes Ziel: ${formatCurrency(CONFIG.tiers[0].threshold)}`;
     }
 
-    // Rewards
     document.getElementById('rewardBonus').textContent = formatCurrency(rewards.bonus);
     document.getElementById('rewardTotal').textContent = formatCurrency(rewards.totalReward);
 
-    // Tier overview
     renderTierOverview(total);
-
-    // Mini chart
     renderMiniChart();
 }
 
 function renderTierOverview(total) {
     const currentTier = getCurrentTier(total);
-
-    // Base info ausblenden
     document.getElementById('tierInfoBase').hidden = true;
 
-    // Tier list
     const container = document.getElementById('tierOverview');
     container.innerHTML = CONFIG.tiers.map(tier => {
         const isReached = total >= tier.threshold;
@@ -373,7 +400,6 @@ function renderTimesheet() {
     table.style.display = '';
 
     let totalMinutes = 0;
-
     tbody.innerHTML = entries.map(e => {
         const netMin = calcNetMinutes(e);
         totalMinutes += netMin;
@@ -410,6 +436,7 @@ function minutesToHours(min) {
     return `${h}:${String(m).padStart(2, '0')}`;
 }
 
+
 // ============================================================
 // CRUD — UMSATZ
 // ============================================================
@@ -420,35 +447,28 @@ const entryDescription = document.getElementById('entryDescription');
 
 entryDate.value = new Date().toISOString().split('T')[0];
 
-entryForm.addEventListener('submit', (e) => {
+entryForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const oldTotal = getMonthlyTotal(currentMonth);
     const oldTier = getCurrentTier(oldTotal);
 
-    const entry = {
-        id: generateId(),
+    const entry = await API.createEntry({
         date: entryDate.value,
         amount: parseFloat(entryAmount.value),
-        description: entryDescription.value.trim(),
-        createdAt: new Date().toISOString()
-    };
+        description: entryDescription.value.trim()
+    });
 
     revenueEntries.push(entry);
-    saveData(STORAGE_KEYS.entries, revenueEntries);
-
-    // Update month to entry month
     currentMonth = entry.date.substring(0, 7);
 
     const newTotal = getMonthlyTotal(currentMonth);
     const newTier = getCurrentTier(newTotal);
 
-    // Check tier upgrade
     if (newTier && getTierIndex(newTier) > getTierIndex(oldTier)) {
         setTimeout(() => showTierUpgrade(newTier, newTotal), 400);
     }
 
-    // Success animation
     const btn = entryForm.querySelector('.btn-primary');
     btn.classList.add('show-success');
     setTimeout(() => btn.classList.remove('show-success'), 1500);
@@ -456,14 +476,13 @@ entryForm.addEventListener('submit', (e) => {
     entryAmount.value = '';
     entryDescription.value = '';
     entryDate.value = new Date().toISOString().split('T')[0];
-
     renderAll();
 });
 
-function deleteEntry(id) {
+async function deleteEntry(id) {
     if (!confirm('Eintrag wirklich löschen?')) return;
+    await API.deleteEntry(id);
     revenueEntries = revenueEntries.filter(e => e.id !== id);
-    saveData(STORAGE_KEYS.entries, revenueEntries);
     renderAll();
 }
 
@@ -476,13 +495,12 @@ function editEntry(id) {
     document.getElementById('editRevenueFields').hidden = false;
     document.getElementById('editTimeFields').hidden = true;
     document.getElementById('editModalTitle').textContent = 'Umsatz bearbeiten';
-
     document.getElementById('editDate').value = entry.date;
     document.getElementById('editAmount').value = entry.amount;
     document.getElementById('editDescription').value = entry.description;
-
     document.getElementById('editModal').hidden = false;
 }
+
 
 // ============================================================
 // CRUD — ZEITERFASSUNG
@@ -492,26 +510,20 @@ const timeDate = document.getElementById('timeDate');
 
 timeDate.value = new Date().toISOString().split('T')[0];
 
-timeForm.addEventListener('submit', (e) => {
+timeForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const entry = {
-        id: generateId(),
+    const entry = await API.createTimeEntry({
         date: document.getElementById('timeDate').value,
         startTime: document.getElementById('timeStart').value,
         endTime: document.getElementById('timeEnd').value,
         breakMinutes: parseInt(document.getElementById('timeBreak').value) || 0,
-        note: document.getElementById('timeNote').value.trim(),
-        createdAt: new Date().toISOString()
-    };
+        note: document.getElementById('timeNote').value.trim()
+    });
 
     timeEntries.push(entry);
-    saveData(STORAGE_KEYS.timeEntries, timeEntries);
-
-    // Update month
     currentMonth = entry.date.substring(0, 7);
 
-    // Success animation
     const btn = timeForm.querySelector('.btn-primary');
     btn.classList.add('show-success');
     setTimeout(() => btn.classList.remove('show-success'), 1500);
@@ -521,14 +533,13 @@ timeForm.addEventListener('submit', (e) => {
     document.getElementById('timeBreak').value = '30';
     document.getElementById('timeNote').value = '';
     timeDate.value = new Date().toISOString().split('T')[0];
-
     renderAll();
 });
 
-function deleteTimeEntry(id) {
+async function deleteTimeEntry(id) {
     if (!confirm('Zeiteintrag wirklich löschen?')) return;
+    await API.deleteTimeEntry(id);
     timeEntries = timeEntries.filter(e => e.id !== id);
-    saveData(STORAGE_KEYS.timeEntries, timeEntries);
     renderAll();
 }
 
@@ -541,42 +552,43 @@ function editTimeEntry(id) {
     document.getElementById('editRevenueFields').hidden = true;
     document.getElementById('editTimeFields').hidden = false;
     document.getElementById('editModalTitle').textContent = 'Zeiteintrag bearbeiten';
-
     document.getElementById('editTimeDate').value = entry.date;
     document.getElementById('editTimeStart').value = entry.startTime;
     document.getElementById('editTimeEnd').value = entry.endTime;
     document.getElementById('editTimeBreak').value = entry.breakMinutes;
     document.getElementById('editTimeNote').value = entry.note;
-
     document.getElementById('editModal').hidden = false;
 }
+
 
 // ============================================================
 // EDIT MODAL
 // ============================================================
-document.getElementById('editForm').addEventListener('submit', (e) => {
+document.getElementById('editForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = document.getElementById('editId').value;
     const type = document.getElementById('editType').value;
 
     if (type === 'revenue') {
+        const data = {
+            date: document.getElementById('editDate').value,
+            amount: parseFloat(document.getElementById('editAmount').value),
+            description: document.getElementById('editDescription').value.trim()
+        };
+        await API.updateEntry(id, data);
         const entry = revenueEntries.find(e => e.id === id);
-        if (entry) {
-            entry.date = document.getElementById('editDate').value;
-            entry.amount = parseFloat(document.getElementById('editAmount').value);
-            entry.description = document.getElementById('editDescription').value.trim();
-            saveData(STORAGE_KEYS.entries, revenueEntries);
-        }
+        if (entry) Object.assign(entry, data);
     } else {
+        const data = {
+            date: document.getElementById('editTimeDate').value,
+            startTime: document.getElementById('editTimeStart').value,
+            endTime: document.getElementById('editTimeEnd').value,
+            breakMinutes: parseInt(document.getElementById('editTimeBreak').value) || 0,
+            note: document.getElementById('editTimeNote').value.trim()
+        };
+        await API.updateTimeEntry(id, data);
         const entry = timeEntries.find(e => e.id === id);
-        if (entry) {
-            entry.date = document.getElementById('editTimeDate').value;
-            entry.startTime = document.getElementById('editTimeStart').value;
-            entry.endTime = document.getElementById('editTimeEnd').value;
-            entry.breakMinutes = parseInt(document.getElementById('editTimeBreak').value) || 0;
-            entry.note = document.getElementById('editTimeNote').value.trim();
-            saveData(STORAGE_KEYS.timeEntries, timeEntries);
-        }
+        if (entry) Object.assign(entry, data);
     }
 
     closeEditModal();
@@ -587,12 +599,12 @@ function closeEditModal() {
     document.getElementById('editModal').hidden = true;
 }
 
+
 // ============================================================
 // TIER UPGRADE — KONFETTI + MODAL
 // ============================================================
 function showTierUpgrade(tier, total) {
     const rewards = calculateRewards(total);
-
     document.getElementById('modalIcon').textContent = tier.icon;
     document.getElementById('modalTitle').textContent = `${tier.name} erreicht!`;
 
@@ -601,13 +613,13 @@ function showTierUpgrade(tier, total) {
 
     document.getElementById('modalText').textContent = text;
     document.getElementById('tierModal').hidden = false;
-
     launchConfetti(tier.color);
 }
 
 function closeTierModal() {
     document.getElementById('tierModal').hidden = true;
 }
+
 
 // ============================================================
 // KONFETTI ENGINE
@@ -645,14 +657,12 @@ function launchConfetti(accentColor) {
 
         particles.forEach(p => {
             p.x += p.vx;
-            p.vy += 0.4; // gravity
+            p.vy += 0.4;
             p.y += p.vy;
             p.vx *= 0.99;
             p.rotation += p.rotSpeed;
 
-            if (frame > maxFrames - 40) {
-                p.opacity = Math.max(0, p.opacity - 0.025);
-            }
+            if (frame > maxFrames - 40) p.opacity = Math.max(0, p.opacity - 0.025);
 
             ctx.save();
             ctx.globalAlpha = p.opacity;
@@ -670,15 +680,13 @@ function launchConfetti(accentColor) {
             ctx.restore();
         });
 
-        if (frame < maxFrames) {
-            requestAnimationFrame(animate);
-        } else {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
+        if (frame < maxFrames) requestAnimationFrame(animate);
+        else ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 
     animate();
 }
+
 
 // ============================================================
 // MINI CHART (Dashboard)
@@ -721,7 +729,6 @@ function renderMiniChart() {
         const x = padding.left + (i * (chartW / last10.length)) + (chartW / last10.length - barW) / 2;
         const y = padding.top + chartH - barH;
 
-        // Bar
         const gradient = ctx.createLinearGradient(x, y, x, y + barH);
         gradient.addColorStop(0, '#6366f1');
         gradient.addColorStop(1, '#a5b4fc');
@@ -730,15 +737,12 @@ function renderMiniChart() {
         ctx.roundRect(x, y, barW, barH, 4);
         ctx.fill();
 
-        // Date label
         ctx.fillStyle = '#94a3b8';
         ctx.font = '10px Inter, sans-serif';
         ctx.textAlign = 'center';
-        const dateLabel = entry.date.split('-')[2] + '.';
-        ctx.fillText(dateLabel, x + barW / 2, h - 5);
+        ctx.fillText(entry.date.split('-')[2] + '.', x + barW / 2, h - 5);
     });
 
-    // Y axis labels
     ctx.fillStyle = '#94a3b8';
     ctx.font = '10px Inter, sans-serif';
     ctx.textAlign = 'right';
@@ -754,6 +758,7 @@ function renderMiniChart() {
         ctx.stroke();
     }
 }
+
 
 // ============================================================
 // STATISTICS
@@ -804,7 +809,6 @@ function renderStatsChart() {
 
     ctx.clearRect(0, 0, w, h);
 
-    // Tier threshold lines
     CONFIG.tiers.forEach(tier => {
         const y = padding.top + chartH - (tier.threshold / maxVal) * chartH;
         if (y > padding.top) {
@@ -819,7 +823,6 @@ function renderStatsChart() {
         }
     });
 
-    // Bars
     data.forEach((d, i) => {
         const barH = Math.max(0, (d.total / maxVal) * chartH);
         const x = padding.left + (i * (chartW / months.length)) + (chartW / months.length - barW) / 2;
@@ -833,13 +836,12 @@ function renderStatsChart() {
         gradient.addColorStop(1, color + '60');
         ctx.fillStyle = gradient;
 
-        ctx.beginPath();
         if (barH > 0) {
+            ctx.beginPath();
             ctx.roundRect(x, y, barW, barH, 3);
             ctx.fill();
         }
 
-        // Highlight current month
         if (d.month === currentMonth) {
             ctx.strokeStyle = '#6366f1';
             ctx.lineWidth = 2;
@@ -848,7 +850,6 @@ function renderStatsChart() {
             ctx.stroke();
         }
 
-        // Month label
         ctx.fillStyle = d.month === currentMonth ? '#6366f1' : '#94a3b8';
         ctx.font = `${d.month === currentMonth ? 'bold ' : ''}9px Inter, sans-serif`;
         ctx.textAlign = 'center';
@@ -857,7 +858,6 @@ function renderStatsChart() {
         ctx.fillText(monthShort, x + barW / 2, h - 8);
     });
 
-    // Y axis
     ctx.fillStyle = '#94a3b8';
     ctx.font = '10px Inter, sans-serif';
     ctx.textAlign = 'right';
@@ -882,11 +882,9 @@ function renderStatsTable() {
         const total = getMonthlyTotal(m);
         const tier = getCurrentTier(total);
         const rewards = calculateRewards(total);
-        const label = getMonthLabel(m);
-
         return `
             <tr${m === currentMonth ? ' style="background:#eef2ff"' : ''}>
-                <td>${label}</td>
+                <td>${getMonthLabel(m)}</td>
                 <td><strong>${formatCurrency(total)}</strong></td>
                 <td>${tier ? `${tier.icon} ${tier.name}` : '—'}</td>
                 <td>${rewards.bonus > 0 ? formatCurrency(rewards.bonus) : '—'}</td>
@@ -898,9 +896,7 @@ function renderStatsTable() {
 function renderYearStats() {
     const year = currentMonth.split('-')[0];
     const yearMonths = [];
-    for (let m = 1; m <= 12; m++) {
-        yearMonths.push(`${year}-${String(m).padStart(2, '0')}`);
-    }
+    for (let m = 1; m <= 12; m++) yearMonths.push(`${year}-${String(m).padStart(2, '0')}`);
 
     const yearTotals = yearMonths.map(m => getMonthlyTotal(m));
     const yearTotal = yearTotals.reduce((s, t) => s + t, 0);
@@ -912,12 +908,9 @@ function renderYearStats() {
         ? getMonthLabel(yearMonths[bestIdx]) + ` (${formatCurrency(yearTotals[bestIdx])})`
         : '—';
 
-    // Year hours
     let yearMinutes = 0;
     yearMonths.forEach(m => {
-        getTimeEntriesForMonth(m).forEach(e => {
-            yearMinutes += calcNetMinutes(e);
-        });
+        getTimeEntriesForMonth(m).forEach(e => { yearMinutes += calcNetMinutes(e); });
     });
 
     document.getElementById('statYearTotal').textContent = formatCurrency(yearTotal);
@@ -926,17 +919,13 @@ function renderYearStats() {
     document.getElementById('statYearHours').textContent = minutesToHours(yearMinutes);
 }
 
+
 // ============================================================
 // DATEN EXPORT / IMPORT / RESET
 // ============================================================
-document.getElementById('exportData').addEventListener('click', () => {
-    const data = {
-        version: 1,
-        exportDate: new Date().toISOString(),
-        revenueEntries: revenueEntries,
-        timeEntries: timeEntries,
-        config: CONFIG
-    };
+document.getElementById('exportData').addEventListener('click', async () => {
+    const data = await API.exportData();
+    data.config = CONFIG;
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -946,68 +935,70 @@ document.getElementById('exportData').addEventListener('click', () => {
     URL.revokeObjectURL(url);
 });
 
-document.getElementById('importData').addEventListener('change', (e) => {
+document.getElementById('importData').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
         try {
             const data = JSON.parse(ev.target.result);
-            if (!data.revenueEntries && !data.timeEntries) {
-                alert('Ungültige Datei!');
-                return;
-            }
+            if (!data.revenueEntries && !data.timeEntries) { alert('Ungültige Datei!'); return; }
             if (!confirm('Vorhandene Daten werden überschrieben. Fortfahren?')) return;
 
+            await API.importData(data);
             revenueEntries = data.revenueEntries || [];
             timeEntries = data.timeEntries || [];
-            saveData(STORAGE_KEYS.entries, revenueEntries);
-            saveData(STORAGE_KEYS.timeEntries, timeEntries);
             renderAll();
             alert('Daten erfolgreich importiert!');
-        } catch {
-            alert('Fehler beim Lesen der Datei!');
-        }
+        } catch { alert('Fehler beim Lesen der Datei!'); }
     };
     reader.readAsText(file);
     e.target.value = '';
 });
 
-document.getElementById('resetData').addEventListener('click', () => {
+document.getElementById('resetData').addEventListener('click', async () => {
     if (!confirm('Alle Daten wirklich löschen?')) return;
     if (!confirm('Bist du sicher? Das kann nicht rückgängig gemacht werden!')) return;
 
+    await API.resetData();
     revenueEntries = [];
     timeEntries = [];
-    saveData(STORAGE_KEYS.entries, revenueEntries);
-    saveData(STORAGE_KEYS.timeEntries, timeEntries);
     renderAll();
     alert('Alle Daten wurden gelöscht.');
 });
 
-// ============================================================
-// PRINT TIMESHEET
-// ============================================================
-document.getElementById('printTimesheet').addEventListener('click', () => {
-    window.print();
-});
 
 // ============================================================
-// WINDOW RESIZE
+// PRINT + RESIZE
 // ============================================================
+document.getElementById('printTimesheet').addEventListener('click', () => window.print());
+
 let resizeTimer;
 window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
         renderMiniChart();
-        if (document.getElementById('tab-statistics').classList.contains('active')) {
-            renderStatsChart();
-        }
+        if (document.getElementById('tab-statistics').classList.contains('active')) renderStatsChart();
     }, 200);
 });
 
+
 // ============================================================
-// INIT
+// INIT — Daten vom Server laden
 // ============================================================
-renderAll();
+async function init() {
+    try {
+        [revenueEntries, timeEntries] = await Promise.all([
+            API.getEntries(),
+            API.getTimeEntries()
+        ]);
+    } catch (err) {
+        console.error('Fehler beim Laden der Daten:', err);
+        revenueEntries = [];
+        timeEntries = [];
+    }
+    renderAll();
+}
+
+init();
