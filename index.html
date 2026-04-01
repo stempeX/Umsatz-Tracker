@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Umsatz-Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Konfetti Canvas -->
+    <canvas id="confettiCanvas"></canvas>
+
+    <!-- Stufenaufstieg Modal -->
+    <div id="tierModal" class="modal-overlay" hidden>
+        <div class="modal">
+            <div class="modal-icon" id="modalIcon"></div>
+            <h2 id="modalTitle">Aufgestiegen!</h2>
+            <p id="modalText"></p>
+            <button class="btn btn-primary" onclick="closeTierModal()">Weiter so!</button>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-top">
+            <h1 class="logo">Umsatz-Tracker</h1>
+            <div class="month-picker">
+                <button class="month-nav" id="prevMonth" aria-label="Vorheriger Monat">&lsaquo;</button>
+                <span id="currentMonthLabel"></span>
+                <button class="month-nav" id="nextMonth" aria-label="Nächster Monat">&rsaquo;</button>
+            </div>
+        </div>
+        <div class="header-total">
+            <span class="header-total-label">Monatsumsatz</span>
+            <span class="header-total-value" id="headerTotal">0,00 €</span>
+        </div>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="tab-nav">
+        <button class="tab active" data-tab="dashboard">
+            <span class="tab-icon">📊</span>
+            <span class="tab-label">Dashboard</span>
+        </button>
+        <button class="tab" data-tab="newEntry">
+            <span class="tab-icon">➕</span>
+            <span class="tab-label">Eintrag</span>
+        </button>
+        <button class="tab" data-tab="entries">
+            <span class="tab-icon">📋</span>
+            <span class="tab-label">Einträge</span>
+        </button>
+        <button class="tab" data-tab="timeTracking">
+            <span class="tab-icon">⏱️</span>
+            <span class="tab-label">Zeiten</span>
+        </button>
+        <button class="tab" data-tab="statistics">
+            <span class="tab-icon">📈</span>
+            <span class="tab-label">Statistik</span>
+        </button>
+    </nav>
+
+    <main class="main">
+
+        <!-- ========== DASHBOARD ========== -->
+        <section id="tab-dashboard" class="tab-content active">
+            <!-- Aktuelle Stufe -->
+            <div class="card tier-card" id="tierCard">
+                <div class="tier-badge" id="tierBadge">
+                    <span class="tier-icon" id="tierIcon">—</span>
+                    <span class="tier-name" id="tierName">Noch keine Stufe</span>
+                </div>
+                <div class="tier-motivation" id="tierMotivation">Trage deinen ersten Umsatz ein!</div>
+            </div>
+
+            <!-- Fortschrittsbalken -->
+            <div class="card">
+                <h3 class="card-title">Fortschritt</h3>
+                <div class="progress-container">
+                    <div class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-fill" id="progressFill"></div>
+                        <div class="progress-pulse" id="progressPulse"></div>
+                    </div>
+                    <div class="progress-markers" id="progressMarkers"></div>
+                </div>
+                <div class="progress-info">
+                    <span id="progressCurrent">0 €</span>
+                    <span id="progressNext"></span>
+                </div>
+            </div>
+
+            <!-- Belohnungen -->
+            <div class="card rewards-card">
+                <h3 class="card-title">Deine Belohnungen</h3>
+                <div class="rewards-grid">
+                    <div class="reward-item">
+                        <span class="reward-label">Bonus</span>
+                        <span class="reward-value" id="rewardBonus">0,00 €</span>
+                    </div>
+                    <div class="reward-item reward-total">
+                        <span class="reward-label">Gesamt</span>
+                        <span class="reward-value" id="rewardTotal">0,00 €</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stufenübersicht -->
+            <div class="card">
+                <h3 class="card-title">Belohnungsstufen</h3>
+                <div class="tier-info-base" id="tierInfoBase"></div>
+                <div class="tier-overview" id="tierOverview"></div>
+            </div>
+
+            <!-- Mini-Chart -->
+            <div class="card">
+                <h3 class="card-title">Letzte Einträge</h3>
+                <canvas id="miniChart" height="150"></canvas>
+                <div class="empty-state" id="miniChartEmpty">
+                    <p>Noch keine Einträge diesen Monat</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== NEUER EINTRAG ========== -->
+        <section id="tab-newEntry" class="tab-content">
+            <div class="card">
+                <h3 class="card-title">Neuen Umsatz eintragen</h3>
+                <form id="entryForm" class="form">
+                    <div class="form-group">
+                        <label for="entryDate">Datum</label>
+                        <input type="date" id="entryDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="entryAmount">Betrag (€)</label>
+                        <div class="input-euro">
+                            <input type="number" id="entryAmount" step="0.01" min="0.01" placeholder="0,00" required>
+                            <span class="euro-symbol">€</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="entryDescription">Beschreibung <span class="optional">(optional)</span></label>
+                        <input type="text" id="entryDescription" placeholder="z.B. Beratung Firma XYZ">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">
+                        <span class="btn-text">Speichern</span>
+                        <span class="btn-success" id="btnSuccess" hidden>✓ Gespeichert!</span>
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- ========== EINTRÄGE ========== -->
+        <section id="tab-entries" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Umsatz-Einträge</h3>
+                    <span class="entry-count" id="entryCount"></span>
+                </div>
+                <div id="entriesList" class="entries-list"></div>
+                <div class="empty-state" id="entriesEmpty">
+                    <p class="empty-icon">📝</p>
+                    <p>Noch keine Einträge diesen Monat.</p>
+                    <p class="empty-hint">Trage deinen ersten Umsatz ein!</p>
+                </div>
+                <div class="entries-total" id="entriesTotalRow" hidden>
+                    <span>Gesamt</span>
+                    <span id="entriesTotal"></span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== ZEITERFASSUNG ========== -->
+        <section id="tab-timeTracking" class="tab-content">
+            <!-- Zeiterfassung Formular -->
+            <div class="card">
+                <h3 class="card-title">Arbeitszeit eintragen</h3>
+                <form id="timeForm" class="form">
+                    <div class="form-group">
+                        <label for="timeDate">Datum</label>
+                        <input type="date" id="timeDate" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="timeStart">Von</label>
+                            <input type="time" id="timeStart" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="timeEnd">Bis</label>
+                            <input type="time" id="timeEnd" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="timeBreak">Pause (Min.)</label>
+                            <input type="number" id="timeBreak" min="0" value="30" step="5">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="timeNote">Notiz <span class="optional">(optional)</span></label>
+                        <input type="text" id="timeNote" placeholder="z.B. Büro, Homeoffice">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">
+                        <span class="btn-text">Speichern</span>
+                        <span class="btn-success" id="timeBtnSuccess" hidden>✓ Gespeichert!</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Stundenzettel -->
+            <div class="card" id="timesheetCard">
+                <div class="card-header">
+                    <h3 class="card-title">Stundenzettel</h3>
+                    <button class="btn btn-small" id="printTimesheet" title="Drucken">🖨️ Drucken</button>
+                </div>
+                <div class="timesheet-table-wrap">
+                    <table class="timesheet-table" id="timesheetTable">
+                        <thead>
+                            <tr>
+                                <th>Datum</th>
+                                <th>Tag</th>
+                                <th>Von</th>
+                                <th>Bis</th>
+                                <th>Pause</th>
+                                <th>Netto</th>
+                                <th>Notiz</th>
+                                <th class="no-print"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="timesheetBody"></tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="5"><strong>Gesamt</strong></td>
+                                <td><strong id="timesheetTotal">0:00</strong></td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <div class="empty-state" id="timesheetEmpty">
+                    <p class="empty-icon">⏱️</p>
+                    <p>Noch keine Zeiten diesen Monat.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== STATISTIK ========== -->
+        <section id="tab-statistics" class="tab-content">
+            <div class="card">
+                <h3 class="card-title">Monatsumsätze</h3>
+                <canvas id="statsChart" height="250"></canvas>
+            </div>
+
+            <div class="card">
+                <h3 class="card-title">Jahresübersicht</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">Jahresumsatz</span>
+                        <span class="stat-value" id="statYearTotal">0,00 €</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Monatsdurchschnitt</span>
+                        <span class="stat-value" id="statMonthAvg">0,00 €</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Bester Monat</span>
+                        <span class="stat-value" id="statBestMonth">—</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Arbeitsstunden (Jahr)</span>
+                        <span class="stat-value" id="statYearHours">0:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monatsübersicht Tabelle -->
+            <div class="card">
+                <h3 class="card-title">Monatsübersicht</h3>
+                <div class="timesheet-table-wrap">
+                    <table class="timesheet-table" id="statsTable">
+                        <thead>
+                            <tr>
+                                <th>Monat</th>
+                                <th>Umsatz</th>
+                                <th>Stufe</th>
+                                <th>Bonus</th>
+                            </tr>
+                        </thead>
+                        <tbody id="statsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Daten-Management -->
+            <div class="card">
+                <h3 class="card-title">Daten-Management</h3>
+                <div class="data-actions">
+                    <button class="btn btn-small" id="exportData">📥 Daten exportieren</button>
+                    <label class="btn btn-small">
+                        📤 Daten importieren
+                        <input type="file" id="importData" accept=".json" hidden>
+                    </label>
+                    <button class="btn btn-small btn-danger" id="resetData">🗑️ Zurücksetzen</button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Bearbeiten-Modal -->
+    <div id="editModal" class="modal-overlay" hidden>
+        <div class="modal modal-edit">
+            <h3 id="editModalTitle">Eintrag bearbeiten</h3>
+            <form id="editForm" class="form">
+                <input type="hidden" id="editId">
+                <input type="hidden" id="editType">
+                <!-- Umsatz-Felder -->
+                <div id="editRevenueFields">
+                    <div class="form-group">
+                        <label for="editDate">Datum</label>
+                        <input type="date" id="editDate">
+                    </div>
+                    <div class="form-group">
+                        <label for="editAmount">Betrag (€)</label>
+                        <input type="number" id="editAmount" step="0.01" min="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label for="editDescription">Beschreibung</label>
+                        <input type="text" id="editDescription">
+                    </div>
+                </div>
+                <!-- Zeit-Felder -->
+                <div id="editTimeFields" hidden>
+                    <div class="form-group">
+                        <label for="editTimeDate">Datum</label>
+                        <input type="date" id="editTimeDate">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editTimeStart">Von</label>
+                            <input type="time" id="editTimeStart">
+                        </div>
+                        <div class="form-group">
+                            <label for="editTimeEnd">Bis</label>
+                            <input type="time" id="editTimeEnd">
+                        </div>
+                        <div class="form-group">
+                            <label for="editTimeBreak">Pause</label>
+                            <input type="number" id="editTimeBreak" min="0" step="5">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="editTimeNote">Notiz</label>
+                        <input type="text" id="editTimeNote">
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-small" onclick="closeEditModal()">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary btn-small">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
